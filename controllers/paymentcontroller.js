@@ -43,7 +43,7 @@ module.exports.getOrderConfirm = async function (req, res) {
     } else {
 
         const query1 = "SELECT `smsportal_authkey` FROM `app_clients_master` WHERE `agent_id` =?"
-        await db1.query(query1,[agent_id], function (err, response, fields) {
+        await db2.query(query1,[agent_id], function (err, response, fields) {
             if (!response.length) {
                 res.status(400).send({
                     status: "error",
@@ -87,11 +87,8 @@ module.exports.getorderDetails = async (req,res) => {
       json: true,
       method: 'Post',
     }
-    console.log(options)
     request(options, (err, response, body) => {
-      // console.log(err)
-      // console.log(response)
-    //   console.log(body)
+    
 
       if (err) {
         res.json(err)
@@ -106,9 +103,7 @@ module.exports.getorderDetails = async (req,res) => {
 }
 
 module.exports.payNow = (req, res) => {
-const order_id=req.body.order_id;
-console.log(order_id)
-    if (!req.body.amount || !req.body.email || !req.body.phone||!order_id) {
+    if (!req.body.amount || !req.body.email || !req.body.phone||!req.body.order_id) {
         res.status(400).send('Payment failed')
       } else {
         var params = {};
@@ -116,7 +111,7 @@ console.log(order_id)
         params['WEBSITE'] = config.PaytmConfig.website;
         params['CHANNEL_ID'] = 'WEB';
         params['INDUSTRY_TYPE_ID'] = 'Retail';
-        params['ORDER_ID'] =  order_id;
+        params['ORDER_ID'] = req.body.order_id;
         params['CUST_ID'] = 'customer_001';
         params['TXN_AMOUNT'] = req.body.amount.toString();
         params['CALLBACK_URL'] = 'http://localhost:3008/callback';
@@ -141,11 +136,10 @@ console.log(order_id)
 }
 
 module.exports.callBack = (req, res) => {
-  console.log('hello', req.body)
   var body = '';
 
   req.on('data', function (data) {
-      console.log(data)
+      // console.log(data)
       body += data;
   });
 
@@ -161,7 +155,7 @@ module.exports.callBack = (req, res) => {
     var checksumhash = post_data.CHECKSUMHASH;
     // delete post_data.CHECKSUMHASH;
     var result = checksum_lib.verifychecksum(post_data, config.PaytmConfig.key, checksumhash);
-    console.log("Checksum Result => ", result, "\n");
+    // console.log("Checksum Result => ", result, "\n");
 
 
     // Send Server-to-Server request to verify Order Status
@@ -215,7 +209,7 @@ const postpaymentTransaction = (_result) => {
   const data=_result;
   
   try {
-    console.log('sending password to smsportal')
+    // console.log('sending password to smsportal')
     return new Promise((resolve, reject) => {
       const api = 'https://portalapi.nutansms.in/postPaymentTransactionwebV5.php';
       const options = {
@@ -241,13 +235,13 @@ const postpaymentTransaction = (_result) => {
         json: true,
         method: 'POST',
       }
-      console.log(options)
+      // console.log(options)
       request(options, (err, response, body) => {
         if (err) {
           console.log(err)
           reject(err);
         } else {
-          console.log(body, 'body')
+          // console.log(body, 'body')
           resolve(true);
         }
       });
