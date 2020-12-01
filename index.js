@@ -18,12 +18,11 @@ app.use(cors());
 // app.use(bodyParser.json(  {extended: true}));
 // app.use(bodyParser.urlencoded({ extended: true }));
 
-app.get('/', function(req, res) {
+app.use('/', require('./Routes/paymentroute'));
+
+app.get('*', function(req, res) {
   res.sendFile(path.join(__dirname + '/dist/index.html'));
 });
-
-
-app.use('/', require('./Routes/paymentroute'));
 
 const port = 3008
 app.listen(port, () => {
