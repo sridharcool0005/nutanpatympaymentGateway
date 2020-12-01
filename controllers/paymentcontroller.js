@@ -1,7 +1,8 @@
 
 var mysql = require('mysql');
-
 const request = require('request');
+const https = require('https')
+const qs = require('querystring')
 
 const checksum_lib = require('../Paytm/checksum')
 const config = require('../Paytm/config')
@@ -78,7 +79,7 @@ module.exports.getorderDetails = async (req,res) => {
  
     const options = {
       url: orderIdApi,
-      qs: { order_id: 'autosms/'+req.body.order_id},
+      qs: { order_id: req.body.order_id},
       headers: {
         'Authorization': 'nh7bhg5f*c#fd@sm9'
       },
@@ -105,7 +106,9 @@ module.exports.getorderDetails = async (req,res) => {
 }
 
 module.exports.payNow = (req, res) => {
-    if (!req.body.amount || !req.body.email || !req.body.phone) {
+const order_id=req.body.order_id;
+console.log(order_id)
+    if (!req.body.amount || !req.body.email || !req.body.phone||!order_id) {
         res.status(400).send('Payment failed')
       } else {
         var params = {};
@@ -113,7 +116,7 @@ module.exports.payNow = (req, res) => {
         params['WEBSITE'] = config.PaytmConfig.website;
         params['CHANNEL_ID'] = 'WEB';
         params['INDUSTRY_TYPE_ID'] = 'Retail';
-        params['ORDER_ID'] = 'TEST_' + new Date().getTime();
+        params['ORDER_ID'] =  order_id;
         params['CUST_ID'] = 'customer_001';
         params['TXN_AMOUNT'] = req.body.amount.toString();
         params['CALLBACK_URL'] = 'http://localhost:3008/callback';
@@ -137,3 +140,119 @@ module.exports.payNow = (req, res) => {
       }
 }
 
+module.exports.callBack = (req, res) => {
+  console.log('hello', req.body)
+  var body = '';
+
+  req.on('data', function (data) {
+      console.log(data)
+      body += data;
+  });
+
+  req.on('end', function () {
+    var html = "";
+    var post_data = qs.parse(body);
+
+    // received params in callback
+    console.log('Callback Response: ', post_data, "\n");
+
+
+    // verify the checksum
+    var checksumhash = post_data.CHECKSUMHASH;
+    // delete post_data.CHECKSUMHASH;
+    var result = checksum_lib.verifychecksum(post_data, config.PaytmConfig.key, checksumhash);
+    console.log("Checksum Result => ", result, "\n");
+
+
+    // Send Server-to-Server request to verify Order Status
+    var params = { "MID": config.PaytmConfig.mid, "ORDERID": post_data.ORDERID };
+
+    checksum_lib.genchecksum(params, config.PaytmConfig.key, function (err, checksum) {
+
+      params.CHECKSUMHASH = checksum;
+      post_data = 'JsonData=' + JSON.stringify(params);
+
+      var options = {
+        hostname: 'securegw-stage.paytm.in', // for staging
+        // hostname: 'securegw.paytm.in', // for production
+        port: 443,
+        path: '/merchant-status/getTxnStatus',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': post_data.length
+        }
+      };
+
+
+      // Set up the request
+      var response = "";
+      var post_req = https.request(options, function (post_res) {
+        post_res.on('data', function (chunk) {
+          response += chunk;
+        });
+
+        post_res.on('end', function () {
+          console.log('S2S Response: ', response, "\n");
+          var _result = JSON.parse(response);
+          
+          postpaymentTransaction(_result);
+          res.render('response', {
+            'data': _result
+          })
+        });
+      });
+
+      // post the data
+      post_req.write(post_data);
+      post_req.end();
+    });
+  });
+}
+
+
+const postpaymentTransaction = (_result) => {
+  const data=_result;
+  
+  try {
+    console.log('sending password to smsportal')
+    return new Promise((resolve, reject) => {
+      const api = 'https://portalapi.nutansms.in/postPaymentTransactionwebV5.php';
+      const options = {
+        url: api,
+        body: {
+          order_id:data.ORDERID,
+          total_amount_paid:data.TXNAMOUNT,
+          payment_mode:data.PAYMENTMODE,
+          payment_gateway_txn_id:data.BANKTXNID,
+          payment_gateway_txn_ref: data.TXNID,
+          payment_status_code :data.STATUS,
+          notes: data.RESPMSG,
+          txntype: data.TXNTYPE,
+          gatewayname:data.GATEWAYNAME,
+          bankname: data.BANKNAME,
+          mid :data.MID,
+          refundamt : data.REFUNDAMT
+        },
+
+        headers: {
+          Authorization: 'nh7bhg5f*c#fd@sm9'
+        },
+        json: true,
+        method: 'POST',
+      }
+      console.log(options)
+      request(options, (err, response, body) => {
+        if (err) {
+          console.log(err)
+          reject(err);
+        } else {
+          console.log(body, 'body')
+          resolve(true);
+        }
+      });
+    })
+  } catch (e) {
+    throw e
+  }
+}
