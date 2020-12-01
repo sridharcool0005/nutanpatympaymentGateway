@@ -54,7 +54,7 @@ module.exports.getOrderConfirm = async function (req, res) {
                 if (authkey === smsportal_authkey) {
                     res.send({
                         status: "success",
-                        paygateway_url:'http://payment.nutanapp.in/'+order_id
+                        paygateway_url:'http://payment.nutanapp.in/confirmOrder/'+order_id
 
                     });
                 }
