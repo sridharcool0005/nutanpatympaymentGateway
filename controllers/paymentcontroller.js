@@ -11,8 +11,8 @@ const config = require('../Paytm/config')
 var db1 = mysql.createConnection({
     host: 'localhost',
     user: 'root',
-    password: 'root',
-    database: 'smsportal',
+    password: '',
+    database: 'test',
     debug: false,
 });
 
@@ -207,46 +207,22 @@ module.exports.callBack = (req, res) => {
 
 const postpaymentTransaction = (_result) => {
   const data=_result;
+  const query = "UPDATE sales_history SET ? where order_id =? ";
+  const postvalues = {
+  mid:data.MID,
+  payment_gateway_txn_id:data.TXNID,
+  total_amount_paid:data.TXNAMOUNT,
+  payment_mode:data.PAYMENTMODE,
+  payment_status:data.STATUS,
+  payment_status_code:data.RESPCODE,
+  notes:data.RESPMSG,
+  gatewayname:data.GATEWAYNAME,
+  bank_txn_id:data.BANKTXNID,
+  bankname:data.BANKNAME,
+}
+console.log(postvalues)
+db1.query(query, [postvalues,data.ORDERID], function (err, result, fields) {
+    if (err) throw err;
   
-  try {
-    // console.log('sending password to smsportal')
-    return new Promise((resolve, reject) => {
-      const api = 'https://portalapi.nutansms.in/postPaymentTransactionwebV5.php';
-      const options = {
-        url: api,
-        body: {
-          order_id:data.ORDERID,
-          total_amount_paid:data.TXNAMOUNT,
-          payment_mode:data.PAYMENTMODE,
-          payment_gateway_txn_id:data.BANKTXNID,
-          payment_gateway_txn_ref: data.TXNID,
-          payment_status_code :data.STATUS,
-          notes: data.RESPMSG,
-          txntype: data.TXNTYPE,
-          gatewayname:data.GATEWAYNAME,
-          bankname: data.BANKNAME,
-          mid :data.MID,
-          refundamt : data.REFUNDAMT
-        },
-
-        headers: {
-          Authorization: 'nh7bhg5f*c#fd@sm9'
-        },
-        json: true,
-        method: 'POST',
-      }
-      // console.log(options)
-      request(options, (err, response, body) => {
-        if (err) {
-          console.log(err)
-          reject(err);
-        } else {
-          // console.log(body, 'body')
-          resolve(true);
-        }
-      });
-    })
-  } catch (e) {
-    throw e
-  }
+})
 }
